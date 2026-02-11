@@ -196,6 +196,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 📧 Contact
 
-Your Name - [@yourtwitter](https://twitter.com/yourtwitter) - your.email@example.com
+Your Name - [@Tarjmul](https://twitter.com/idont5300)
 
-Project Link: [https://github.com/yourusername/youtube-playlist-downloader](https://github.com/yourusername/youtube-playlist-downloader)
+Project Link: [https://github.com/Tarjmu810/Youtube-Playlist-Downloader](https://github.com/Tarjmu810/Youtube-Playlist-Downloader)
