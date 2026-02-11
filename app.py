@@ -23,6 +23,8 @@ def get_playlist_info(url: str):
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
+
+        playlistTitle = info.get('title')
         
         videos = []
         for entry in info['entries']:
@@ -36,10 +38,9 @@ def get_playlist_info(url: str):
                 'id': entry['id'],
                 'title': entry['title'],
                 'url': entry['url'],
-                'thumbnail': thumbnail_url
+                'thumbnail': thumbnail_url,
+                'playlistTitle': playlistTitle
             })
-        
-        print(info['entries'][0])
         return {'videos': videos}
 
 
