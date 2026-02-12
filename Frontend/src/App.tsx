@@ -7,14 +7,22 @@ interface Video {
   id: string;
   title: string;
   thumbnail: string;
-  playlistTitle: string;  
+  playlistTitle: string;
 }
+
+const STATUS = {
+  IDLE: 'idle',
+  PROCESSING: 'processing',
+  DONE: 'done',
+  FAILED: 'failed',
+};
 
 function App() {
   const [playlistUrl, setPlaylistUrl] = useState('');
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedVideos, setSelectedVideos] = useState(new Set());
+  const [downloadStatus, setDownloadStatus] = useState<Record<string, string>>({});
 
   const fetchPlaylist = async () => {
     if (!playlistUrl.trim()) return;
@@ -22,7 +30,7 @@ function App() {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/playlist-info?url=${encodeURIComponent(playlistUrl)}`
+        `http://localhost:8000/api/playlist-info?url=${encodeURIComponent(playlistUrl)}`
       );
       const data = await response.json();
       setVideos(data.videos);
@@ -34,13 +42,46 @@ function App() {
     setLoading(false);
   };
 
-  const downloadVideo = (videoId: string, title: string) => {
-    const link = document.createElement('a');
-    link.href = `http://127.0.0.1:8000/api/download-video?video_id=${encodeURIComponent(videoId)}`;
-    link.download = `${title}.mp4`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const updateStatus = (videoId: string, status: string) => {
+    setDownloadStatus(prev => ({
+      ...prev,
+      [videoId]: status,
+    }));
+  };
+
+  const downloadVideo = async (videoId: string, title: string) => {
+    try {
+      updateStatus(videoId, STATUS.PROCESSING);
+      // First check if download is possible
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/download-video?video_id=${videoId}`
+      );
+
+      // Check if response is an error
+      if (!response.ok) {
+        const error = await response.json();
+        updateStatus(videoId, STATUS.FAILED);
+
+        alert(`${error.message}`);
+        return;
+      }
+
+      // If successful, trigger download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${title}.mp4`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+
+      updateStatus(videoId, STATUS.DONE);
+
+    } catch (error) {
+      console.error('Download error:', error);
+      updateStatus(videoId, STATUS.FAILED);
+      alert('Failed to download video. Please try again.');
+    }
   };
 
   const downloadSelected = async () => {
@@ -57,7 +98,7 @@ function App() {
   const downloadAll = async () => {
     for (let i = 0; i < videos.length; i++) {
       const video: Video = videos[i];
-      downloadVideo(video.id, video.title);
+      await downloadVideo(video.id, video.title);
       if (i < videos.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
@@ -82,9 +123,47 @@ function App() {
     }
   };
 
+  const getButtonConfig = (videoId: string) => {
+    const status = downloadStatus[videoId];
+
+    switch (status) {
+      case STATUS.PROCESSING:
+        return {
+          label: 'Processing',
+          className:
+            'bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/10 cursor-not-allowed',
+          disabled: true,
+        };
+
+      case STATUS.DONE:
+        return {
+          label: 'Downloaded',
+          className:
+            'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/10',
+          disabled: false,
+        };
+
+      case STATUS.FAILED:
+        return {
+          label: 'Retry',
+          className:
+            'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20',
+          disabled: false,
+        };
+
+      default:
+        return {
+          label: 'Download',
+          className:
+            'bg-indigo-500 hover:bg-indigo-400 text-white shadow-md',
+          disabled: false,
+        };
+    }
+  };
+
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200">
-
 
       <div className="sticky top-0 z-20 backdrop-blur-xl bg-slate-900/70 border-b border-slate-800">
         <div className="h-16 flex items-center justify-between px-6 lg:px-10">
@@ -94,7 +173,6 @@ function App() {
             <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white font-semibold text-sm shadow-md">
               Y
             </div>
-
             <div className="flex flex-col leading-tight">
               <span className="text-sm font-semibold text-slate-100 tracking-tight">
                 Playlist Downloader
@@ -113,7 +191,6 @@ function App() {
                 {videos.length} Videos
               </div>
             )}
-
             <button className="text-xs text-slate-400 hover:text-slate-200 transition">
               Help
             </button>
@@ -130,7 +207,6 @@ function App() {
             <p className="text-xs text-slate-400 uppercase tracking-wide mb-3">
               Playlist URL
             </p>
-
             <div className="flex gap-4">
               <Input
                 type="text"
@@ -141,7 +217,6 @@ function App() {
                 className="h-11 flex-1 bg-slate-800 border-slate-700 text-slate-200 placeholder:text-slate-500"
                 disabled={loading}
               />
-
               <Button
                 onClick={fetchPlaylist}
                 disabled={loading || !playlistUrl.trim()}
@@ -153,23 +228,38 @@ function App() {
           </div>
         </section>
 
+        {/* Playlist Info */}
         {videos.length > 0 && (
           <section className="mb-6 flex items-center gap-6">
-            <div className="w-28 h-28 rounded-xl bg-slate-800 flex items-center justify-center text-slate-500 text-sm border border-slate-700">
-              <img src={videos[0].thumbnail} alt="" />
+            <div className="w-28 h-28 rounded-xl bg-slate-800 flex items-center justify-center text-slate-500 text-sm border border-slate-700 overflow-hidden">
+              <img src={videos[0].thumbnail} alt="" className="w-full h-full object-cover" />
             </div>
-
             <div>
               <h2 className="text-lg font-semibold text-slate-100">
-                {videos[0].playlistTitle}
+                {videos[0].playlistTitle || 'Playlist'}
               </h2>
               <p className="text-sm text-slate-400 mt-1">
                 {videos.length} videos loaded
               </p>
+              {/* Overall download progress */}
+              {Object.keys(downloadStatus).length > 0 && (
+                <div className="flex items-center gap-3 mt-2 text-xs">
+                  <span className="text-emerald-400/80">
+                     {Object.values(downloadStatus).filter(s => s === STATUS.DONE).length} done
+                  </span>
+                  <span className="text-amber-400/80">
+                     {Object.values(downloadStatus).filter(s => s === STATUS.PROCESSING).length} processing
+                  </span>
+                  <span className="text-red-400/80">
+                     {Object.values(downloadStatus).filter(s => s === STATUS.FAILED).length} failed
+                  </span>
+                </div>
+              )}
             </div>
           </section>
         )}
 
+        {/* Action Bar */}
         {videos.length > 0 && (
           <section className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-3 text-sm text-slate-400">
@@ -179,7 +269,6 @@ function App() {
               />
               Select all ({videos.length})
             </div>
-
             <div className="flex items-center gap-3">
               <Button
                 size="sm"
@@ -189,7 +278,6 @@ function App() {
               >
                 Download Selected ({selectedVideos.size})
               </Button>
-
               <Button
                 size="sm"
                 variant="outline"
@@ -205,43 +293,77 @@ function App() {
         {/* Video List */}
         {videos.length > 0 && (
           <section className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+            {videos.map((video, index) => {
+              const buttonConfig = getButtonConfig(video.id);
+              const status = downloadStatus[video.id];
 
-            {videos.map((video, index) => (
-              <div
-                key={video.id}
-                className="flex items-center gap-5 px-6 py-4 border-b border-slate-800 last:border-b-0 hover:bg-slate-800/50 transition"
-              >
-                <Checkbox
-                  checked={selectedVideos.has(video.id)}
-                  onCheckedChange={() => toggleVideo(video.id)}
-                />
-
-                <div className="text-xs text-slate-500 w-6 text-right">
-                  {index + 1}
-                </div>
-
-                <img
-                  src={video.thumbnail}
-                  alt={video.title}
-                  className="w-40 h-24 object-cover rounded-lg"
-                />
-
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-100 truncate">
-                    {video.title}
-                  </p>
-                </div>
-
-                <Button
-                  size="sm"
-                  className="bg-indigo-500 hover:bg-indigo-400 text-white"
-                  onClick={() => downloadVideo(video.id, video.title)}
+              return (
+                <div
+                  key={video.id}
+                  className={`flex items-center gap-5 px-6 py-4 border-b border-slate-800 last:border-b-0 transition
+                    ${status === STATUS.PROCESSING ? 'bg-yellow-500/5' : ''}
+                    ${status === STATUS.DONE ? 'bg-emerald-500/5' : ''}
+                    ${status === STATUS.FAILED ? 'bg-red-500/5' : ''}
+                    ${!status ? 'hover:bg-slate-800/50' : ''}
+                  `}
                 >
-                  Download
-                </Button>
-              </div>
-            ))}
+                  {/* Checkbox */}
+                  <Checkbox
+                    checked={selectedVideos.has(video.id)}
+                    onCheckedChange={() => toggleVideo(video.id)}
+                    disabled={status === STATUS.PROCESSING}
+                  />
 
+                  {/* Index */}
+                  <div className="text-xs text-slate-500 w-6 text-right">
+                    {index + 1}
+                  </div>
+
+                  {/* Thumbnail */}
+                  <img
+                    src={video.thumbnail}
+                    alt={video.title}
+                    className="w-40 h-24 object-cover rounded-lg shrink-0"
+                  />
+
+                  {/* Title + Status Message */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-100 truncate">
+                      {video.title}
+                    </p>
+
+                    {status && (
+                      <p
+                        className={`text-xs mt-1 ${status === STATUS.PROCESSING
+                            ? 'text-amber-400/80'
+                            : status === STATUS.DONE
+                              ? 'text-emerald-400/80'
+                              : status === STATUS.FAILED
+                                ? 'text-red-400/80'
+                                : ''
+                          }`}
+                      >
+                        {status === STATUS.PROCESSING && 'Processing download…'}
+                        {status === STATUS.DONE && 'Download complete'}
+                        {status === STATUS.FAILED && 'Download failed'}
+                      </p>
+                    )}
+                  </div>
+
+
+                  {/* Download Button */}
+                  <Button
+                    size="sm"
+                    onClick={() => downloadVideo(video.id, video.title)}
+                    disabled={buttonConfig.disabled}
+                    className={`text-white flex-shrink-0 ${buttonConfig.className}`}
+                  >
+                    {buttonConfig.label}
+                  </Button>
+
+                </div>
+              );
+            })}
           </section>
         )}
 
@@ -253,7 +375,6 @@ function App() {
         )}
 
       </div>
-
     </div>
   );
 }
