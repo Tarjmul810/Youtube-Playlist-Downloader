@@ -4,13 +4,14 @@ from fastapi.middleware.cors import CORSMiddleware
 import yt_dlp
 import requests
 import os
+import tempfile
 import uuid
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -68,7 +69,8 @@ def download_video(video_id: str):
     
     # Unique temp filename to avoid conflicts
     unique_id = str(uuid.uuid4())[:8]
-    temp_path = f"/tmp/video_{unique_id}.mp4"
+    temp_dir = tempfile.gettempdir()  # Gets correct temp folder on ANY OS
+    temp_path = os.path.join(temp_dir, f"video_{unique_id}.mp4")
     
     ydl_opts = {
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
