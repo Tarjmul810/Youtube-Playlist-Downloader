@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Checkbox } from './components/ui/checkbox';
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface Video {
   id: string;
@@ -30,7 +31,7 @@ function App() {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:8000/api/playlist-info?url=${encodeURIComponent(playlistUrl)}`
+        `${API_URL}/api/playlist-info?url=${encodeURIComponent(playlistUrl)}`
       );
       const data = await response.json();
       setVideos(data.videos);
@@ -54,7 +55,7 @@ function App() {
       updateStatus(videoId, STATUS.PROCESSING);
       // First check if download is possible
       const response = await fetch(
-        `http://127.0.0.1:8000/api/download-video?video_id=${videoId}`
+        `${API_URL}/api/download-video?video_id=${videoId}`
       );
 
       // Check if response is an error
