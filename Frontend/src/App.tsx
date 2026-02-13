@@ -356,7 +356,7 @@ function App() {
                     size="sm"
                     onClick={() => downloadVideo(video.id, video.title)}
                     disabled={buttonConfig.disabled}
-                    className={`text-white flex-shrink-0 ${buttonConfig.className}`}
+                    className={`text-white shrink-0 ${buttonConfig.className}`}
                   >
                     {buttonConfig.label}
                   </Button>
